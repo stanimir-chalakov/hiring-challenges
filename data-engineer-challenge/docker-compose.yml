@@ -20,6 +20,19 @@ services:
     depends_on:
       - mqtt_broker
 
+  iot_ingest:
+    build: ./iot_ingest
+    environment:
+      MQTT_HOST: mqtt_broker
+      MQTT_PORT: 1883
+      MQTT_TOPIC: sensors
+      LOCAL_PATH: /data
+    volumes:
+      - ./data:/data
+    depends_on:
+      - mqtt_broker
+
+
 
 volumes:
   data: ~
