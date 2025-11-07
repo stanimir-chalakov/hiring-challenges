@@ -29,9 +29,21 @@ services:
       LOCAL_PATH: /data
     volumes:
       - ./data:/data
+      - ./utils:/app/utils
     depends_on:
       - mqtt_broker
 
+
+  etl:
+    build: ./iot_etl
+    environment:
+      DATA_PATH: /data
+      DB_PATH: /data/duckdb/iot_data.duckdb
+    volumes:
+      - ./data:/data
+      - ./utils:/app/utils
+    depends_on:
+      - iot_ingest
 
 
 volumes:

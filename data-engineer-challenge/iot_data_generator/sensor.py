@@ -22,7 +22,7 @@ class Sensor:
 
             payload = json.dumps(data, default=str)
 
-            logging.info(f"{topic}: {payload}")
+            #logging.info(f"{topic}: {payload}")
 
             mqtt_client.publish(topic, payload)
             await asyncio.sleep(self.interval_ms / 1000)

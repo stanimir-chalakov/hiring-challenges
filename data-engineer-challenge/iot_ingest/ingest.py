@@ -2,7 +2,9 @@ import os
 import json
 from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
+from utils.logger import setup_logger, colorize_message
 
+logger = setup_logger("iot_ingest")
 
 class IoTIngestor:
     def __init__(self):
@@ -17,11 +19,14 @@ class IoTIngestor:
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
 
+        self._last_file_path = None
+
+
     def on_connect(self, client, userdata, flags, rc):
         """Callback when MQTT connects."""
-        print(f"[Ingest] Connected to MQTT broker at {self.mqtt_host}:{self.mqtt_port} (code {rc})")
+        logger.info(colorize_message(f"[Ingest] Connected to MQTT broker at {self.mqtt_host}:{self.mqtt_port} (code {rc})"))
         client.subscribe(self.mqtt_topic)
-        print(f"[Ingest] Subscribed to topic: {self.mqtt_topic}")
+        logger.info(colorize_message(f"[Ingest] Subscribed to topic: {self.mqtt_topic}"))
 
     def on_message(self, client, userdata, msg):
         """Callback for new messages."""
@@ -44,28 +49,29 @@ class IoTIngestor:
 
             with open(file_path, "a") as f:
                 f.write(line + "\n")
-
-            print(f"[Ingest] Appended message to → {file_path}")
+            if file_path != self._last_file_path:
+                logger.info(colorize_message(f"[Ingest] Appended message to → {file_path}"))
+                self._last_file_path = file_path
 
         except Exception as e:
-            print(f"[Ingest] Error processing message: {e}")
+            logger.error(colorize_message(f"[Ingest] Error processing message: {e}"))
 
     def run(self):
         """Start MQTT client loop."""
-        print("[Ingest] Starting MQTT ingestion service...")
+        logger.info(colorize_message("[Ingest] Starting MQTT ingestion service..."))
         try:
             self.client.connect(self.mqtt_host, self.mqtt_port)
         except Exception as e:
-            print(f"[Ingest] Could not connect to MQTT broker: {e}")
+            logger.error(colorize_message(f"[Ingest] Could not connect to MQTT broker: {e}"))
             raise
 
         # start network loop (blocking)
         try:
             self.client.loop_forever()
         except KeyboardInterrupt:
-            print("[Ingest] Keyboard interrupt received, stopping")
+            logger.info(colorize_message("[Ingest] Keyboard interrupt received, stopping"))
         except Exception as e:
-            print(f"[Ingest] MQTT loop error: {e}")
+            logger.error(colorize_message(f"[Ingest] MQTT loop error: {e}"))
 
 
 if __name__ == "__main__":
