@@ -32,7 +32,7 @@ class IoTDataLoader:
             );
         """)
         self.dbcon.execute("""
-            CREATE TABLE IF NOT EXISTS processed_files (
+            CREATE TABLE IF NOT EXISTS log_bronze_processed_files (
                 file_name VARCHAR PRIMARY KEY,
                 processed_at TIMESTAMP
             );
@@ -44,7 +44,7 @@ class IoTDataLoader:
         if not all_files:
             return []
 
-        result = self.dbcon.execute("SELECT file_name FROM processed_files").fetchdf()
+        result = self.dbcon.execute("SELECT file_name FROM log_bronze_processed_files").fetchdf()
         processed = set(result["file_name"].tolist())
 
         eligible_files = []
@@ -106,7 +106,7 @@ class IoTDataLoader:
             self.dbcon.unregister("df")
 
             self.dbcon.execute(
-                "INSERT INTO processed_files (file_name, processed_at) VALUES (?, ?)",
+                "INSERT INTO log_bronze_processed_files (file_name, processed_at) VALUES (?, ?)",
                 (f, datetime.utcnow().isoformat())
             )
             logger.info(colorize_message(f"[IoTDataLoader] Loaded {len(df)} records from {f}"))
@@ -123,7 +123,7 @@ class IoTDataLoader:
         """)
 
         self.dbcon.execute("""
-            CREATE TABLE IF NOT EXISTS silver_processed_files (
+            CREATE TABLE IF NOT EXISTS log_silver_processed_files (
     			file_name VARCHAR PRIMARY KEY,
     			processed_at TIMESTAMP
 				);
@@ -137,7 +137,7 @@ class IoTDataLoader:
                 strftime(b.timestamp, '%Y-%m-%d %H:%M:%S.%f') AS timestamp,
                 b.value
             FROM iot_data_bronze b
-            LEFT JOIN silver_processed_files spf
+            LEFT JOIN log_silver_processed_files spf
             	ON b.file_name = spf.file_name
             WHERE spf.file_name IS NULL
             	AND b.sensor_id IS NOT NULL
@@ -147,10 +147,10 @@ class IoTDataLoader:
         """)
 
         self.dbcon.execute("""
-    		INSERT INTO silver_processed_files (file_name, processed_at)
+    		INSERT INTO log_silver_processed_files (file_name, processed_at)
     		SELECT DISTINCT b.file_name, CURRENT_TIMESTAMP
     		FROM iot_data_bronze b
-    		LEFT JOIN silver_processed_files spf
+    		LEFT JOIN log_silver_processed_files spf
        		ON b.file_name = spf.file_name
     		WHERE spf.file_name IS NULL;
 		""")
@@ -170,7 +170,7 @@ class IoTDataLoader:
     """)
 
         self.dbcon.execute("""
-        CREATE TABLE IF NOT EXISTS gold_processed_minutes (
+        CREATE TABLE IF NOT EXISTS log_gold_processed_minutes (
             sensor_id VARCHAR,
             minute_window TIMESTAMP,
             PRIMARY KEY(sensor_id, minute_window)
@@ -190,7 +190,7 @@ class IoTDataLoader:
         			date_trunc('minute', s.timestamp) AS minute_window,
         			s.value
     			FROM iot_data_silver s
-    			LEFT JOIN gold_processed_minutes gpm
+    			LEFT JOIN log_gold_processed_minutes gpm
         			ON s.sensor_id = gpm.sensor_id
        				AND date_trunc('minute', s.timestamp) = gpm.minute_window
     			WHERE gpm.sensor_id IS NULL
@@ -200,10 +200,10 @@ class IoTDataLoader:
         logger.info(colorize_message("[IoTDataLoader] Gold table (1-minute resample) refreshed.", color="yellow"))
 
         self.dbcon.execute("""
-        	INSERT INTO gold_processed_minutes (sensor_id, minute_window)
+        	INSERT INTO log_gold_processed_minutes (sensor_id, minute_window)
         	SELECT DISTINCT s.sensor_id, date_trunc('minute', s.timestamp)
         	FROM iot_data_silver s
-        	LEFT JOIN gold_processed_minutes gpm
+        	LEFT JOIN log_gold_processed_minutes gpm
             	ON s.sensor_id = gpm.sensor_id
             	AND date_trunc('minute', s.timestamp) = gpm.minute_window
         	WHERE gpm.sensor_id IS NULL;
